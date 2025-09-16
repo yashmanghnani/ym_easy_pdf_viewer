@@ -1,0 +1,29 @@
+name: easy_pdf_viewer_example
+description: Demonstrates how to use the easy_pdf_viewer plugin.
+
+# The following line prevents the package from being accidentally published to
+# pub.dev using `pub publish`. This is preferred for private packages.
+publish_to: 'none' # Remove this line if you wish to publish to pub.dev
+
+environment:
+  sdk: ">=3.4.0 <4.0.0"      
+  flutter: ">=3.29.3"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  ym_easy_pdf_viewer:
+    path: ../
+
+  cupertino_icons: ^1.0.8
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+flutter:
+
+  uses-material-design: true
+  assets:
+    - assets/sample.pdf
+    - assets/sample2.pdf

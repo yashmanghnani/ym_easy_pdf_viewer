@@ -1,0 +1,31 @@
+group 'dev.kaichi.easy_pdf_viewer'
+version '1.0.7'
+
+buildscript {
+    repositories {
+        google()
+        jcenter()
+    }
+
+    dependencies {
+        classpath 'com.android.tools.build:gradle:8.13.0'
+    }
+}
+
+rootProject.allprojects {
+    repositories {
+        google()
+        jcenter()
+    }
+}
+
+apply plugin: 'com.android.library'
+
+android {
+    namespace "dev.kaichi.easy_pdf_viewer"
+    compileSdkVersion 36
+
+    defaultConfig {
+        minSdkVersion 23
+    }
+}
