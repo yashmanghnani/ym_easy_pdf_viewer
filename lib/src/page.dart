@@ -1,26 +1,15 @@
 import 'dart:io';
-import 'package:ym_easy_pdf_viewer/src/zoomable_widget.dart';
+
 import 'package:flutter/widgets.dart';
 
-/// A class to represent PDF page
-/// [imgPath], path of the image (pdf page)
-/// [num], page number
-/// [onZoomChanged], function called when zoom is changed
-/// [zoomSteps], number of zoom steps on double tap
-/// [minScale] minimum zoom scale
-/// [maxScale] maximum zoom scale
-/// [panLimit] limit for pan
+import 'zoomable_widget.dart';
+
+/// A widget that displays one rendered PDF page.
 class PDFPage extends StatefulWidget {
-  final String? imgPath;
-  final int num;
-  final Function(double)? onZoomChanged;
-  final int zoomSteps;
-  final double minScale;
-  final double maxScale;
-  final double panLimit;
-  PDFPage(
+  const PDFPage(
     this.imgPath,
     this.num, {
+    super.key,
     this.onZoomChanged,
     this.zoomSteps = 3,
     this.minScale = 1.0,
@@ -28,46 +17,59 @@ class PDFPage extends StatefulWidget {
     this.panLimit = 1.0,
   });
 
+  /// The path of the rendered page image.
+  final String? imgPath;
+
+  /// The one-based page number.
+  final int num;
+  final ValueChanged<double>? onZoomChanged;
+  final int zoomSteps;
+  final double minScale;
+  final double maxScale;
+  final double panLimit;
+
   @override
-  _PDFPageState createState() => _PDFPageState();
+  State<PDFPage> createState() => _PDFPageState();
 }
 
 class _PDFPageState extends State<PDFPage> {
-  late ImageProvider provider;
+  ImageProvider<Object>? _provider;
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _repaint();
+  void initState() {
+    super.initState();
+    _updateProvider();
   }
 
   @override
   void didUpdateWidget(PDFPage oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.imgPath != widget.imgPath) {
-      _repaint();
+      _updateProvider();
     }
   }
 
-  void _repaint() {
-    provider = FileImage(File(widget.imgPath!));
-    final resolver = provider.resolve(createLocalImageConfiguration(context));
-    resolver.addListener(ImageStreamListener((imgInfo, alreadyPainted) {
-      if (mounted && !alreadyPainted) setState(() {});
-    }));
+  void _updateProvider() {
+    _provider = widget.imgPath == null
+        ? null
+        : FileImage(File(widget.imgPath!));
   }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: null,
-      child: ZoomableWidget(
-        onZoomChanged: widget.onZoomChanged,
-        zoomSteps: widget.zoomSteps,
-        minScale: widget.minScale,
-        panLimit: widget.panLimit,
-        maxScale: widget.maxScale,
-        child: Image(image: provider),
+    final ImageProvider<Object>? provider = _provider;
+    if (provider == null) return const SizedBox.shrink();
+
+    return ZoomableWidget(
+      onZoomChanged: widget.onZoomChanged,
+      zoomSteps: widget.zoomSteps,
+      minScale: widget.minScale,
+      panLimit: widget.panLimit,
+      maxScale: widget.maxScale,
+      child: Image(
+        image: provider,
+        fit: BoxFit.contain,
+        filterQuality: FilterQuality.medium,
       ),
     );
   }

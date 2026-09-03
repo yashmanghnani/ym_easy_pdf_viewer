@@ -1,6 +1,14 @@
-# easy_pdf_viewer_example
+# ym_easy_pdf_viewer example
 
-Demonstrates how to use the easy_pdf_viewer plugin.
+Demonstrates asset, local/remote URL, page navigation, zoom, and download
+progress loading with `ym_easy_pdf_viewer`.
+
+Run it from this directory with:
+
+```sh
+flutter pub get
+flutter run
+```
 
 ## Getting Started
 

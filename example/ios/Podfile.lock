@@ -1,43 +1,36 @@
 PODS:
-  - easy_pdf_viewer (1.0.7):
-    - Flutter
   - Flutter (1.0.0)
-  - FMDB (2.7.5):
-    - FMDB/standard (= 2.7.5)
-  - FMDB/standard (2.7.5)
-  - path_provider (0.0.1):
+  - path_provider_foundation (0.0.1):
     - Flutter
-  - sqflite (0.0.2):
+    - FlutterMacOS
+  - sqflite_darwin (0.0.4):
     - Flutter
-    - FMDB (>= 2.7.5)
+    - FlutterMacOS
+  - ym_easy_pdf_viewer (1.0.0):
+    - Flutter
 
 DEPENDENCIES:
-  - easy_pdf_viewer (from `.symlinks/plugins/easy_pdf_viewer/ios`)
   - Flutter (from `Flutter`)
-  - path_provider (from `.symlinks/plugins/path_provider/ios`)
-  - sqflite (from `.symlinks/plugins/sqflite/ios`)
-
-SPEC REPOS:
-  trunk:
-    - FMDB
+  - path_provider_foundation (from `.symlinks/plugins/path_provider_foundation/darwin`)
+  - sqflite_darwin (from `.symlinks/plugins/sqflite_darwin/darwin`)
+  - ym_easy_pdf_viewer (from `.symlinks/plugins/ym_easy_pdf_viewer/ios`)
 
 EXTERNAL SOURCES:
-  easy_pdf_viewer:
-    :path: ".symlinks/plugins/easy_pdf_viewer/ios"
   Flutter:
     :path: Flutter
-  path_provider:
-    :path: ".symlinks/plugins/path_provider/ios"
-  sqflite:
-    :path: ".symlinks/plugins/sqflite/ios"
+  path_provider_foundation:
+    :path: ".symlinks/plugins/path_provider_foundation/darwin"
+  sqflite_darwin:
+    :path: ".symlinks/plugins/sqflite_darwin/darwin"
+  ym_easy_pdf_viewer:
+    :path: ".symlinks/plugins/ym_easy_pdf_viewer/ios"
 
 SPEC CHECKSUMS:
-  easy_pdf_viewer: 87ea0602930e7b1c8eecd36b362604254d2ad018
-  Flutter: f04841e97a9d0b0a8025694d0796dd46242b2854
-  FMDB: 2ce00b547f966261cd18927a3ddb07cb6f3db82a
-  path_provider: abfe2b5c733d04e238b0d8691db0cfd63a27a93c
-  sqflite: 6d358c025f5b867b29ed92fc697fd34924e11904
+  Flutter: 71a624a5bc0c04062bf19101d501e466baf2fb47
+  path_provider_foundation: 080d55be775b7414fd5a5ef3ac137b97b097e564
+  sqflite_darwin: 20b2a3a3b70e43edae938624ce550a3cbf66a3d0
+  ym_easy_pdf_viewer: b0ca06663757742ba4a3eb1912d54649a94039da
 
-PODFILE CHECKSUM: 5c2b6d00e6c2d112a7da7dafe89d082a51264ef5
+PODFILE CHECKSUM: d6bc44bfaf31d0e80e1375ff53c8faede294dcb8
 
-COCOAPODS: 1.12.1
+COCOAPODS: 1.16.2

@@ -1,22 +1,22 @@
+import 'dart:async';
+
 import 'package:easy_pdf_viewer_example/with_progress.dart';
 import 'package:flutter/material.dart';
-import 'package:ym_easy_pdf_viewer/easy_pdf_viewer.dart';
+import 'package:ym_easy_pdf_viewer/ym_easy_pdf_viewer.dart';
 
-void main() => runApp(App());
+void main() => runApp(const App());
 
 class App extends StatelessWidget {
-  const App({Key? key}) : super(key: key);
+  const App({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      home: MyApp(),
-    );
+    return const MaterialApp(home: MyApp());
   }
 }
 
 class MyApp extends StatefulWidget {
-  const MyApp({this.progressExample = false});
+  const MyApp({super.key, this.progressExample = false});
 
   final bool progressExample;
 
@@ -31,16 +31,16 @@ class _MyAppState extends State<MyApp> {
   @override
   void initState() {
     super.initState();
-    loadDocument();
+    unawaited(_loadDocument());
   }
 
-  loadDocument() async {
+  Future<void> _loadDocument() async {
     document = await PDFDocument.fromAsset('assets/sample.pdf');
 
-    setState(() => _isLoading = false);
+    if (mounted) setState(() => _isLoading = false);
   }
 
-  changePDF(value) async {
+  Future<void> _changePDF(int value) async {
     setState(() => _isLoading = true);
     if (value == 1) {
       document = await PDFDocument.fromAsset('assets/sample2.pdf');
@@ -59,7 +59,7 @@ class _MyAppState extends State<MyApp> {
     } else {
       document = await PDFDocument.fromAsset('assets/sample.pdf');
     }
-    setState(() => _isLoading = false);
+    if (mounted) setState(() => _isLoading = false);
   }
 
   @override
@@ -72,19 +72,19 @@ class _MyAppState extends State<MyApp> {
             ListTile(
               title: Text('Load from Assets'),
               onTap: () {
-                changePDF(1);
+                _changePDF(1);
               },
             ),
             ListTile(
               title: Text('Load from URL'),
               onTap: () {
-                changePDF(2);
+                _changePDF(2);
               },
             ),
             ListTile(
               title: Text('Restore default'),
               onTap: () {
-                changePDF(3);
+                _changePDF(3);
               },
             ),
             ListTile(
@@ -92,18 +92,14 @@ class _MyAppState extends State<MyApp> {
               onTap: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(
-                    builder: (context) => WithProgress(),
-                  ),
+                  MaterialPageRoute(builder: (context) => const WithProgress()),
                 );
               },
             ),
           ],
         ),
       ),
-      appBar: AppBar(
-        title: const Text('PDFViewer'),
-      ),
+      appBar: AppBar(title: const Text('PDFViewer')),
       body: Center(
         child: _isLoading
             ? Center(child: CircularProgressIndicator())
@@ -111,9 +107,7 @@ class _MyAppState extends State<MyApp> {
                 document: document,
                 lazyLoad: false,
                 zoomSteps: 1,
-                numberPickerConfirmWidget: const Text(
-                  "Confirm",
-                ),
+                numberPickerConfirmWidget: const Text("Confirm"),
                 //uncomment below line to preload all pages
                 // lazyLoad: false,
                 // uncomment below line to scroll vertically

@@ -3,177 +3,230 @@ import 'dart:io';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
-import 'package:ym_easy_pdf_viewer/src/page.dart';
 import 'package:path_provider/path_provider.dart';
 
+import 'page.dart';
+
+/// Error thrown when a PDF cannot be loaded or rendered.
+class PDFDocumentException implements Exception {
+  const PDFDocumentException(this.message, {this.cause});
+
+  final String message;
+  final Object? cause;
+
+  @override
+  String toString() => cause == null
+      ? 'PDFDocumentException: $message'
+      : 'PDFDocumentException: $message ($cause)';
+}
+
+/// A loaded PDF document.
 class PDFDocument {
-  static const MethodChannel _channel =
-      const MethodChannel('easy_pdf_viewer_plugin');
+  PDFDocument._({required this._filePath, required this.count});
 
-  String? _filePath;
-  late int count;
-  List<PDFPage> _pages = [];
-  bool _preloaded = false;
+  static const MethodChannel _channel = MethodChannel('easy_pdf_viewer_plugin');
 
-  /// expose file path for pdf sharing capabilities
-  String? get filePath => _filePath;
+  final String _filePath;
+  final int count;
+  final List<PDFPage?> _pages = <PDFPage?>[];
 
-  /// Load a PDF File from a given File
-  /// [File file], file to be loaded
+  /// The local path used to read the PDF.
+  String get filePath => _filePath;
+
+  static Future<PDFDocument> _fromPath(
+    String path, {
+    required bool clearPreviewCache,
+  }) async {
+    try {
+      final Object? rawPageCount = await _channel.invokeMethod<Object?>(
+        'getNumberOfPages',
+        <String, Object?>{'filePath': path, 'clearCacheDir': clearPreviewCache},
+      );
+      final int pageCount = _parsePageCount(rawPageCount);
+      if (pageCount < 1) {
+        throw const PDFDocumentException('The PDF does not contain any pages.');
+      }
+      return PDFDocument._(filePath: path, count: pageCount);
+    } on PDFDocumentException {
+      rethrow;
+    } on Object catch (error, stackTrace) {
+      Error.throwWithStackTrace(
+        PDFDocumentException('Unable to read PDF at "$path".', cause: error),
+        stackTrace,
+      );
+    }
+  }
+
+  static int _parsePageCount(Object? value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    if (value is String) {
+      final int? parsed = int.tryParse(value);
+      if (parsed != null) return parsed;
+    }
+    throw const PDFDocumentException(
+      'The native PDF renderer returned an invalid page count.',
+    );
+  }
+
+  /// Loads a PDF from a local [file].
+  static Future<PDFDocument> fromFile(
+    File file, {
+    bool clearPreviewCache = true,
+  }) async {
+    if (!await file.exists()) {
+      throw PDFDocumentException('PDF file does not exist: ${file.path}');
+    }
+    return _fromPath(file.path, clearPreviewCache: clearPreviewCache);
+  }
+
+  /// Downloads and loads a PDF from [url].
+  static Future<PDFDocument> fromURL(
+    String url, {
+    Map<String, String>? headers,
+    CacheManager? cacheManager,
+    bool clearPreviewCache = true,
+  }) async {
+    try {
+      final File file = await (cacheManager ?? DefaultCacheManager())
+          .getSingleFile(url, headers: headers);
+      return await _fromPath(file.path, clearPreviewCache: clearPreviewCache);
+    } on PDFDocumentException {
+      rethrow;
+    } on Object catch (error, stackTrace) {
+      Error.throwWithStackTrace(
+        PDFDocumentException(
+          'Unable to download PDF from "$url".',
+          cause: error,
+        ),
+        stackTrace,
+      );
+    }
+  }
+
+  /// Downloads a PDF and reports progress until [onDownloadComplete] fires.
   ///
-  /// Automatically clears the on-disk cache of previously rendered PDF previews
-  /// unless [clearPreviewCache] is set to `false`. The option to disable it
-  /// comes in handy when working with more than one document at the same time.
-  /// If you do this, you are responsible for eventually clearing the cache by hand
-  /// by calling [PDFDocument.clearPreviewCache].
-  static Future<PDFDocument> fromFile(File file,
-      {bool clearPreviewCache = true}) async {
-    PDFDocument document = PDFDocument();
-    document._filePath = file.path;
-    try {
-      var pageCount = await _channel.invokeMethod('getNumberOfPages',
-          {'filePath': file.path, 'clearCacheDir': clearPreviewCache});
-      document.count = document.count = int.parse(pageCount);
-    } catch (e) {
-      throw Exception('Error reading PDF!');
-    }
-    return document;
-  }
-
-  /// Load a PDF File from a given URL.
-  /// File is saved in cache
-  /// 
-  /// [String url] url of the pdf file
-  /// [Map<String,String headers] headers to pass for the [url]
-  /// [CacheManager cacheManager] to provide configuration for
-  /// cache management
-  /// Automatically clears the on-disk cache of previously rendered PDF previews
-  /// unless [clearPreviewCache] is set to `false`. The option to disable it
-  /// comes in handy when working with more than one document at the same time.
-  /// If you do this, you are responsible for eventually clearing the cache by hand
-  /// by calling [PDFDocument.clearPreviewCache].
-  static Future<PDFDocument> fromURL(String url,
-      {Map<String, String>? headers, CacheManager? cacheManager, clearPreviewCache = true}) async {
-    // Download into cache
-    File f = await (cacheManager ?? DefaultCacheManager())
-        .getSingleFile(url, headers: headers);
-    PDFDocument document = PDFDocument();
-    document._filePath = f.path;
-    try {
-      var pageCount = await _channel.invokeMethod('getNumberOfPages',
-          {'filePath': f.path, 'clearCacheDir': clearPreviewCache});
-      document.count = document.count = int.parse(pageCount);
-    } catch (e) {
-      throw Exception('Error reading PDF!');
-    }
-    return document;
-  }
-
-  /// Load a PDF File from a given URL, notifies download progress until completed
-  /// File is saved in cache
-  /// 
-  /// [String url] url of the pdf file
-  /// [Map<String,String headers] headers to pass for the [url]
-  /// [CacheManager cacheManager] to provide configuration for
-  /// cache management
-  /// Automatically clears the on-disk cache of previously rendered PDF previews
-  /// unless [clearPreviewCache] is set to `false`. The option to disable it
-  /// comes in handy when working with more than one document at the same time.
-  /// If you do this, you are responsible for eventually clearing the cache by hand
-  /// by calling [PDFDocument.clearPreviewCache].
-  /// Use [downloadProgress] to get the download progress information. NOTE that 
-  /// [downloadProgress] is not called after [onDownloadComplete].
-  /// Once the download is finished, [onDownloadComplete] is called. If the file
-  /// is already available, [onDownloadComplete] is called directly.
-  static void fromURLWithDownloadProgress(
+  /// The returned subscription can be cancelled when the owning screen is
+  /// disposed or the request is no longer needed.
+  static StreamSubscription<FileResponse> fromURLWithDownloadProgress(
     String url, {
     Map<String, String>? headers,
     CacheManager? cacheManager,
     bool clearPreviewCache = true,
     required void Function(DownloadProgress downloadProgress) downloadProgress,
     required void Function(PDFDocument document) onDownloadComplete,
+    void Function(Object error, StackTrace stackTrace)? onError,
   }) {
-    StreamSubscription<FileResponse>? streamSubscription;
-    final fileResponse = (cacheManager ?? DefaultCacheManager())
-        .getFileStream(url, headers: headers, withProgress: true);
+    late final StreamSubscription<FileResponse> subscription;
+    bool completed = false;
+    final Stream<FileResponse> responses =
+        (cacheManager ?? DefaultCacheManager()).getFileStream(
+          url,
+          headers: headers,
+          withProgress: true,
+        );
 
-    streamSubscription = fileResponse.listen(
-      (event) async {
-        if (event is DownloadProgress) {
-          downloadProgress.call(event);
+    Future<void> complete(File file) async {
+      try {
+        final PDFDocument document = await fromFile(
+          file,
+          clearPreviewCache: clearPreviewCache,
+        );
+        onDownloadComplete(document);
+      } catch (error, stackTrace) {
+        onError?.call(error, stackTrace);
+      } finally {
+        await subscription.cancel();
+      }
+    }
+
+    subscription = responses.listen(
+      (FileResponse response) {
+        if (response is DownloadProgress) {
+          downloadProgress(response);
           return;
         }
-
-        if (event is FileInfo) {
-          final pdfDocument =
-              await fromFile(event.file, clearPreviewCache: clearPreviewCache);
-          onDownloadComplete.call(pdfDocument);
-          streamSubscription?.cancel();
-          return;
+        if (response is FileInfo && !completed) {
+          completed = true;
+          unawaited(complete(response.file));
         }
       },
+      onError: (Object error, StackTrace stackTrace) {
+        onError?.call(error, stackTrace);
+      },
     );
+    return subscription;
   }
-  
-  /// Load a PDF File from assets folder
-  /// 
-  /// [String asset] path of the asset to be loaded
-  /// Automatically clears the on-disk cache of previously rendered PDF previews
-  /// unless [clearPreviewCache] is set to `false`. The option to disable it
-  /// comes in handy when working with more than one document at the same time.
-  /// If you do this, you are responsible for eventually clearing the cache by hand
-  /// by calling [PDFDocument.clearPreviewCache].
-  static Future<PDFDocument> fromAsset(String asset,
-      {clearPreviewCache = true}) async {
-    // To open from assets, you can copy them to the app storage folder, and the access them "locally"
-    File file;
+
+  /// Copies an asset PDF to application storage and loads it.
+  static Future<PDFDocument> fromAsset(
+    String asset, {
+    bool clearPreviewCache = true,
+  }) async {
     try {
-      var dir = await getApplicationDocumentsDirectory();
-      file = File("${dir.path}/file.pdf");
-      var data = await rootBundle.load(asset);
-      var bytes = data.buffer.asUint8List();
+      final Directory directory = await getApplicationDocumentsDirectory();
+      final String fileName = asset
+          .replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_')
+          .replaceFirst(RegExp(r'^_+'), '');
+      final String assetId = asset.hashCode.toUnsigned(32).toRadixString(16);
+      final File file = File(
+        '${directory.path}/ym_easy_pdf_viewer_${assetId}_$fileName',
+      );
+      final ByteData data = await rootBundle.load(asset);
+      final Uint8List bytes = data.buffer.asUint8List(
+        data.offsetInBytes,
+        data.lengthInBytes,
+      );
       await file.writeAsBytes(bytes, flush: true);
-    } catch (e) {
-      throw Exception('Error parsing asset file!');
+      return await _fromPath(file.path, clearPreviewCache: clearPreviewCache);
+    } on PDFDocumentException {
+      rethrow;
+    } on Object catch (error, stackTrace) {
+      Error.throwWithStackTrace(
+        PDFDocumentException(
+          'Unable to load PDF asset "$asset".',
+          cause: error,
+        ),
+        stackTrace,
+      );
     }
-    PDFDocument document = PDFDocument();
-    document._filePath = file.path;
-    try {
-      var pageCount = await _channel.invokeMethod('getNumberOfPages',
-          {'filePath': file.path, 'clearCacheDir': clearPreviewCache});
-      document.count = document.count = int.parse(pageCount);
-    } catch (e) {
-      throw Exception('Error reading PDF!');
-    }
-    return document;
   }
 
-  /// Clears an on-disk cache of previously rendered PDF previews.
-  ///
-  /// This is normally done automatically by methods such as [fromFile],
-  /// [fromURL], and [fromAsset], unless they are run with the
-  /// `clearPreviewCache` parameter set to `false`.
+  /// Clears rendered page previews from the native cache.
   static Future<void> clearPreviewCache() async {
-    await _channel.invokeMethod('clearCacheDir');
+    try {
+      await _channel.invokeMethod<void>('clearCacheDir');
+    } on Object catch (error, stackTrace) {
+      Error.throwWithStackTrace(
+        PDFDocumentException(
+          'Unable to clear the PDF preview cache.',
+          cause: error,
+        ),
+        stackTrace,
+      );
+    }
   }
 
-  /// Load specific page
-  ///
-  /// [page] defaults to `1` and must be equal or above it
+  /// Loads one page, using the in-memory page cache when available.
   Future<PDFPage> get({
     int page = 1,
-    final Function(double)? onZoomChanged,
-    final int? zoomSteps,
-    final double? minScale,
-    final double? maxScale,
-    final double? panLimit,
+    ValueChanged<double>? onZoomChanged,
+    int? zoomSteps,
+    double? minScale,
+    double? maxScale,
+    double? panLimit,
   }) async {
-    assert(page > 0);
-    if (_preloaded && _pages.isNotEmpty) return _pages[page - 1];
-    var data = await _channel
-        .invokeMethod('getPage', {'filePath': _filePath, 'pageNumber': page});
-    return new PDFPage(
-      data,
+    RangeError.checkValueInInterval(page, 1, count, 'page');
+    final int index = page - 1;
+    final PDFPage? cachedPage = index < _pages.length ? _pages[index] : null;
+    if (cachedPage != null) return cachedPage;
+
+    final Object? data = await _channel.invokeMethod<Object?>(
+      'getPage',
+      <String, Object?>{'filePath': _filePath, 'pageNumber': page},
+    );
+    final PDFPage loadedPage = PDFPage(
+      data as String?,
       page,
       onZoomChanged: onZoomChanged,
       zoomSteps: zoomSteps ?? 3,
@@ -181,44 +234,37 @@ class PDFDocument {
       maxScale: maxScale ?? 5.0,
       panLimit: panLimit ?? 1.0,
     );
-  }
-
-  Future<void> preloadPages({
-    final Function(double)? onZoomChanged,
-    final int? zoomSteps,
-    final double? minScale,
-    final double? maxScale,
-    final double? panLimit,
-  }) async {
-    int countvar = 1;
-    for (final _ in List.filled(count, null)) {
-      final data = await _channel.invokeMethod(
-          'getPage', {'filePath': _filePath, 'pageNumber': countvar});
-      _pages.add(PDFPage(
-        data,
-        countvar,
-        onZoomChanged: onZoomChanged,
-        zoomSteps: zoomSteps ?? 3,
-        minScale: minScale ?? 1.0,
-        maxScale: maxScale ?? 5.0,
-        panLimit: panLimit ?? 1.0,
-      ));
-      countvar++;
+    while (_pages.length <= index) {
+      _pages.add(null);
     }
-    _preloaded = true;
+    _pages[index] = loadedPage;
+    return loadedPage;
   }
 
-  // Stream all pages
-  Stream<PDFPage?> getAll({final Function(double)? onZoomChanged}) {
-    return Future.forEach<PDFPage?>(List.filled(count, null), (i) async {
-      print(i);
-      final data = await _channel
-          .invokeMethod('getPage', {'filePath': _filePath, 'pageNumber': i});
-      return new PDFPage(
-        data,
-        1,
+  /// Loads every page into the document's page cache.
+  Future<void> preloadPages({
+    ValueChanged<double>? onZoomChanged,
+    int? zoomSteps,
+    double? minScale,
+    double? maxScale,
+    double? panLimit,
+  }) async {
+    for (int page = 1; page <= count; page++) {
+      await get(
+        page: page,
         onZoomChanged: onZoomChanged,
+        zoomSteps: zoomSteps,
+        minScale: minScale,
+        maxScale: maxScale,
+        panLimit: panLimit,
       );
-    }).asStream() as Stream<PDFPage?>;
+    }
+  }
+
+  /// Streams pages in document order.
+  Stream<PDFPage> getAll({ValueChanged<double>? onZoomChanged}) async* {
+    for (int page = 1; page <= count; page++) {
+      yield await get(page: page, onZoomChanged: onZoomChanged);
+    }
   }
 }

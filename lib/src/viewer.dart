@@ -1,72 +1,18 @@
-import 'package:ym_easy_pdf_viewer/easy_pdf_viewer.dart';
-import 'package:ym_easy_pdf_viewer/src/page_picker.dart';
 import 'package:flutter/material.dart';
 
-/// enum to describe indicator position
+import 'document.dart';
+import 'page.dart';
+import 'page_picker.dart';
+import 'tooltip.dart';
+
+/// The location of the built-in page indicator.
 enum IndicatorPosition { topLeft, topRight, bottomLeft, bottomRight }
 
-/// PDFViewer, a inbuild pdf viewer, you can create your own too.
-/// [document] an instance of `PDFDocument`, document to be loaded
-/// [indicatorText] color of indicator text
-/// [indicatorBackground] color of indicator background
-/// [pickerButtonColor] the picker button background color
-/// [pickerIconColor] the picker button icon color
-/// [indicatorPosition] position of the indicator position defined by `IndicatorPosition` enum
-/// [showIndicator] show,hide indicator
-/// [showPicker] show hide picker
-/// [showNavigation] show hide navigation bar
-/// [toolTip] tooltip, instance of `PDFViewerTooltip`
-/// [enableSwipeNavigation] enable,disable swipe navigation
-/// [scrollDirection] scroll direction horizontal or vertical
-/// [lazyLoad] lazy load pages or load all at once
-/// [controller] page controller to control page viewer
-/// [zoomSteps] zoom steps for pdf page
-/// [minScale] minimum zoom scale for pdf page
-/// [maxScale] maximum zoom scale for pdf page
-/// [panLimit] pan limit for pdf page
-/// [onPageChanged] function called when page changes
-///
+/// A ready-to-use PDF viewer with lazy page rendering, zoom, and navigation.
 class PDFViewer extends StatefulWidget {
-  final PDFDocument document;
-  final Color indicatorText;
-  final Color indicatorBackground;
-  final Color? pickerButtonColor;
-  final Color? pickerIconColor;
-  final IndicatorPosition indicatorPosition;
-  final Widget numberPickerConfirmWidget;
-  final bool showIndicator;
-  final bool showPicker;
-  final bool showNavigation;
-  final PDFViewerTooltip tooltip;
-  final bool enableSwipeNavigation;
-  final Axis? scrollDirection;
-  final bool lazyLoad;
-  final PageController? controller;
-  final int? zoomSteps;
-  final double? minScale;
-  final double? maxScale;
-  final double? panLimit;
-  final ValueChanged<int>? onPageChanged;
-  final Color? backgroundColor;
-  final Function(double)? onZoomChanged;
-  final bool? resizeToAvoidBottomInset;
-
-  final Widget Function(
-    BuildContext,
-    int? pageNumber,
-    int? totalPages,
-    void Function({int page}) jumpToPage,
-    void Function({int? page}) animateToPage,
-  )? navigationBuilder;
-
-  final Widget? progressIndicator;
-
-  final Widget Function(BuildContext, int? pageNumber, int? totalPages)?
-      indicatorBuilder;
-
-  PDFViewer({
-    Key? key,
+  const PDFViewer({
     required this.document,
+    super.key,
     this.scrollDirection,
     this.lazyLoad = true,
     this.indicatorText = Colors.white,
@@ -92,288 +38,356 @@ class PDFViewer extends StatefulWidget {
     this.indicatorBuilder,
     this.onZoomChanged,
     this.resizeToAvoidBottomInset = true,
-  }) : super(key: key);
+  });
 
-  _PDFViewerState createState() => _PDFViewerState();
+  final PDFDocument document;
+  final Color indicatorText;
+  final Color indicatorBackground;
+  final Color? pickerButtonColor;
+  final Color? pickerIconColor;
+  final IndicatorPosition indicatorPosition;
+  final Widget numberPickerConfirmWidget;
+  final bool showIndicator;
+  final bool showPicker;
+  final bool showNavigation;
+  final PDFViewerTooltip tooltip;
+  final bool enableSwipeNavigation;
+  final Axis? scrollDirection;
+  final bool lazyLoad;
+  final PageController? controller;
+  final int? zoomSteps;
+  final double? minScale;
+  final double? maxScale;
+  final double? panLimit;
+  final ValueChanged<int>? onPageChanged;
+  final Color? backgroundColor;
+  final ValueChanged<double>? onZoomChanged;
+  final bool? resizeToAvoidBottomInset;
+
+  final Widget Function(
+    BuildContext,
+    int? pageNumber,
+    int? totalPages,
+    void Function({int page}) jumpToPage,
+    void Function({int? page}) animateToPage,
+  )?
+  navigationBuilder;
+
+  final Widget? progressIndicator;
+
+  final Widget Function(BuildContext, int? pageNumber, int? totalPages)?
+  indicatorBuilder;
+
+  @override
+  State<PDFViewer> createState() => _PDFViewerState();
 }
 
 class _PDFViewerState extends State<PDFViewer> {
-  bool _isLoading = true;
-  late int _pageNumber;
-  bool _swipeEnabled = true;
-  List<PDFPage?>? _pages;
   late PageController _pageController;
-  final Duration animationDuration = Duration(milliseconds: 200);
-  final Curve animationCurve = Curves.easeIn;
+  late bool _ownsPageController;
+  late int _pageNumber;
+  List<PDFPage?> _pages = <PDFPage?>[];
+  bool _isLoading = true;
+  bool _swipeEnabled = true;
+  int _loadToken = 0;
+
+  static const Duration _animationDuration = Duration(milliseconds: 200);
+  static const Curve _animationCurve = Curves.easeIn;
 
   @override
   void initState() {
     super.initState();
-    _pages = List.filled(widget.document.count, null);
-    _pageController = widget.controller ?? PageController();
-    _pageNumber = _pageController.initialPage + 1;
-    if (!widget.lazyLoad) _preloadPages();
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _pageNumber = _pageController.initialPage + 1;
-    _isLoading = true;
-    _pages = List.filled(widget.document.count, null);
-    // _loadAllPages();
-    _loadPage();
+    _setPageController(widget.controller);
+    _resetPages();
+    if (widget.lazyLoad) {
+      _loadPage();
+    } else {
+      _preloadPages();
+    }
   }
 
   @override
   void didUpdateWidget(PDFViewer oldWidget) {
     super.didUpdateWidget(oldWidget);
-  }
-
-  onZoomChanged(double scale) {
-    widget.onZoomChanged?.call(scale);
-
-    if (scale != 1.0) {
-      setState(() {
-        _swipeEnabled = false;
-      });
-    } else {
-      setState(() {
-        _swipeEnabled = true;
-      });
+    if (oldWidget.controller != widget.controller) {
+      if (_ownsPageController) _pageController.dispose();
+      _setPageController(widget.controller);
+    }
+    if (oldWidget.document != widget.document ||
+        oldWidget.lazyLoad != widget.lazyLoad) {
+      _resetPages();
+      if (widget.lazyLoad) {
+        _loadPage();
+      } else {
+        _preloadPages();
+      }
     }
   }
 
-  _preloadPages() async {
-    int countvar = 1;
-    for (final _ in List.filled(widget.document.count, null)) {
-      final data = await widget.document.get(
-        page: countvar,
-        onZoomChanged: onZoomChanged,
+  void _setPageController(PageController? controller) {
+    _ownsPageController = controller == null;
+    _pageController = controller ?? PageController();
+  }
+
+  void _resetPages() {
+    _loadToken++;
+    _pages = List<PDFPage?>.filled(widget.document.count, null);
+    _pageNumber =
+        _pageController.initialPage.clamp(0, widget.document.count - 1) + 1;
+    _isLoading = true;
+  }
+
+  @override
+  void dispose() {
+    _loadToken++;
+    if (_ownsPageController) _pageController.dispose();
+    super.dispose();
+  }
+
+  void _onZoomChanged(double scale) {
+    widget.onZoomChanged?.call(scale);
+    final bool swipeEnabled = scale == 1.0;
+    if (_swipeEnabled != swipeEnabled && mounted) {
+      setState(() => _swipeEnabled = swipeEnabled);
+    }
+  }
+
+  Future<void> _preloadPages() async {
+    final int token = _loadToken;
+    for (int page = 1; page <= widget.document.count; page++) {
+      final PDFPage loadedPage = await widget.document.get(
+        page: page,
+        onZoomChanged: _onZoomChanged,
         zoomSteps: widget.zoomSteps,
         minScale: widget.minScale,
         maxScale: widget.maxScale,
         panLimit: widget.panLimit,
       );
-      _pages![countvar - 1] = data;
-
-      countvar++;
+      if (!mounted || token != _loadToken) return;
+      _pages[page - 1] = loadedPage;
+      if (page == 1) setState(() {});
+    }
+    if (mounted && token == _loadToken) {
+      setState(() => _isLoading = false);
     }
   }
 
-  _loadPage() async {
-    if (_pages![_pageNumber - 1] != null) return;
-    setState(() {
-      _isLoading = true;
-    });
-    final data = await widget.document.get(
+  Future<void> _loadPage() async {
+    if (_pageNumber < 1 || _pageNumber > _pages.length) return;
+    final int index = _pageNumber - 1;
+    if (_pages[index] != null) {
+      if (mounted && _isLoading) setState(() => _isLoading = false);
+      return;
+    }
+
+    final int token = _loadToken;
+    if (mounted && !_isLoading) setState(() => _isLoading = true);
+    final PDFPage loadedPage = await widget.document.get(
       page: _pageNumber,
-      onZoomChanged: onZoomChanged,
+      onZoomChanged: _onZoomChanged,
       zoomSteps: widget.zoomSteps,
       minScale: widget.minScale,
       maxScale: widget.maxScale,
       panLimit: widget.panLimit,
     );
-    _pages![_pageNumber - 1] = data;
-    if (mounted) {
-      setState(() {
-        _isLoading = false;
-      });
-    }
+    if (!mounted || token != _loadToken) return;
+    _pages[index] = loadedPage;
+    setState(() => _isLoading = false);
   }
 
-  _animateToPage({int? page}) {
-    _pageController.animateToPage(page != null ? page : _pageNumber - 1,
-        duration: animationDuration, curve: animationCurve);
+  Future<void> _animateToPage({int? page}) async {
+    await _pageController.animateToPage(
+      page ?? _pageNumber - 1,
+      duration: _animationDuration,
+      curve: _animationCurve,
+    );
   }
 
-  _jumpToPage({int? page}) {
-    _pageController.jumpToPage(page != null ? page : _pageNumber - 1);
+  void _jumpToPage({int? page}) {
+    _pageController.jumpToPage(page ?? _pageNumber - 1);
   }
 
   Widget _drawIndicator() {
-    if (widget.indicatorBuilder != null)
-      return widget.indicatorBuilder!(
-          context, _pageNumber, widget.document.count);
-
-    Widget child = GestureDetector(
+    final Widget child = GestureDetector(
       onTap: widget.showPicker && widget.document.count > 1 ? _pickPage : null,
       child: Container(
-        padding:
-            EdgeInsets.only(top: 4.0, left: 16.0, bottom: 4.0, right: 16.0),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(4.0),
-            color: widget.indicatorBackground),
+          borderRadius: BorderRadius.circular(4),
+          color: widget.indicatorBackground,
+        ),
         child: Text(
-          "$_pageNumber/${widget.document.count}",
+          '$_pageNumber/${widget.document.count}',
           style: TextStyle(
             color: widget.indicatorText,
-            fontSize: 16.0,
+            fontSize: 16,
             fontWeight: FontWeight.w400,
           ),
         ),
       ),
     );
 
-    switch (widget.indicatorPosition) {
-      case IndicatorPosition.topLeft:
-        return Positioned(top: 20, left: 20, child: child);
-      case IndicatorPosition.topRight:
-        return Positioned(top: 20, right: 20, child: child);
-      case IndicatorPosition.bottomLeft:
-        return Positioned(bottom: 20, left: 20, child: child);
-      case IndicatorPosition.bottomRight:
-        return Positioned(bottom: 20, right: 20, child: child);
-      default:
-        return Positioned(top: 20, right: 20, child: child);
+    if (widget.indicatorBuilder != null) {
+      return widget.indicatorBuilder!(
+        context,
+        _pageNumber,
+        widget.document.count,
+      );
     }
+
+    return switch (widget.indicatorPosition) {
+      IndicatorPosition.topLeft => Positioned(top: 20, left: 20, child: child),
+      IndicatorPosition.topRight => Positioned(
+        top: 20,
+        right: 20,
+        child: child,
+      ),
+      IndicatorPosition.bottomLeft => Positioned(
+        bottom: 20,
+        left: 20,
+        child: child,
+      ),
+      IndicatorPosition.bottomRight => Positioned(
+        bottom: 20,
+        right: 20,
+        child: child,
+      ),
+    };
   }
 
-  _pickPage() {
-    showDialog<int>(
-        context: context,
-        builder: (BuildContext context) {
-          return PagePicker(
-            title: widget.tooltip.pick,
-            maxValue: widget.document.count,
-            initialValue: _pageNumber,
-            numberPickerConfirmWidget: widget.numberPickerConfirmWidget,
-          );
-        }).then((int? value) {
-      if (value != null) {
-        _pageNumber = value;
-        _jumpToPage();
-      }
-    });
+  Future<void> _pickPage() async {
+    final int? page = await showDialog<int>(
+      context: context,
+      builder: (BuildContext context) => PagePicker(
+        title: widget.tooltip.pick,
+        maxValue: widget.document.count,
+        initialValue: _pageNumber,
+        numberPickerConfirmWidget: widget.numberPickerConfirmWidget,
+      ),
+    );
+    if (!mounted || page == null) return;
+    _pageNumber = page;
+    _jumpToPage();
   }
 
   @override
   Widget build(BuildContext context) {
+    final bool canNavigate = widget.document.count > 1;
     return Scaffold(
       resizeToAvoidBottomInset: widget.resizeToAvoidBottomInset,
       backgroundColor: widget.backgroundColor,
       body: Stack(
         children: <Widget>[
           PageView.builder(
+            controller: _pageController,
+            itemCount: _pages.length,
+            scrollDirection: widget.scrollDirection ?? Axis.horizontal,
             physics:
                 _swipeEnabled && widget.enableSwipeNavigation && !_isLoading
-                    ? null
-                    : NeverScrollableScrollPhysics(),
-            onPageChanged: (page) {
-              setState(() {
-                _pageNumber = page + 1;
-              });
+                ? null
+                : const NeverScrollableScrollPhysics(),
+            onPageChanged: (int page) {
+              setState(() => _pageNumber = page + 1);
               _loadPage();
               widget.onPageChanged?.call(page);
             },
-            scrollDirection: widget.scrollDirection ?? Axis.horizontal,
-            controller: _pageController,
-            itemCount: _pages?.length ?? 0,
-            itemBuilder: (context, index) => _pages![index] == null
-                ? Center(
+            itemBuilder: (BuildContext context, int index) {
+              final PDFPage? page = _pages[index];
+              return page ??
+                  Center(
                     child:
-                        widget.progressIndicator ?? CircularProgressIndicator(),
-                  )
-                : _pages![index]!,
+                        widget.progressIndicator ??
+                        const CircularProgressIndicator(),
+                  );
+            },
           ),
-          (widget.showIndicator && !_isLoading)
-              ? _drawIndicator()
-              : Container(),
+          if (widget.showIndicator && !_isLoading) _drawIndicator(),
         ],
       ),
-      floatingActionButton: widget.showPicker && widget.document.count > 1
+      floatingActionButton: widget.showPicker && canNavigate
           ? FloatingActionButton(
-              elevation: 4.0,
+              backgroundColor: widget.pickerButtonColor ?? Colors.blue,
+              onPressed: _pickPage,
               tooltip: widget.tooltip.jump,
               child: Icon(
                 Icons.view_carousel,
                 color: widget.pickerIconColor ?? Colors.white,
               ),
-              backgroundColor: widget.pickerButtonColor ?? Colors.blue,
-              onPressed: () {
-                _pickPage();
-              },
             )
           : null,
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-      bottomNavigationBar: (widget.showNavigation && widget.document.count > 1)
-          ? widget.navigationBuilder != null
-              ? widget.navigationBuilder!(
+      bottomNavigationBar: widget.showNavigation && canNavigate
+          ? widget.navigationBuilder?.call(
                   context,
                   _pageNumber,
                   widget.document.count,
                   _jumpToPage,
                   _animateToPage,
-                )
-              : BottomAppBar(
-                  child: new Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: <Widget>[
-                      Expanded(
-                        child: IconButton(
-                          icon: Icon(Icons.first_page),
-                          tooltip: widget.tooltip.first,
-                          onPressed: _pageNumber == 1 || _isLoading
-                              ? null
-                              : () {
-                                  _pageNumber = 1;
-                                  _jumpToPage();
-                                },
-                        ),
-                      ),
-                      Expanded(
-                        child: IconButton(
-                          icon: Icon(Icons.chevron_left),
-                          tooltip: widget.tooltip.previous,
-                          onPressed: _pageNumber == 1 || _isLoading
-                              ? null
-                              : () {
-                                  _pageNumber--;
-                                  if (1 > _pageNumber) {
-                                    _pageNumber = 1;
-                                  }
-                                  _animateToPage();
-                                },
-                        ),
-                      ),
-                      widget.showPicker
-                          ? Expanded(child: Text(''))
-                          : SizedBox(width: 1),
-                      Expanded(
-                        child: IconButton(
-                          icon: Icon(Icons.chevron_right),
-                          tooltip: widget.tooltip.next,
-                          onPressed:
-                              _pageNumber == widget.document.count || _isLoading
-                                  ? null
-                                  : () {
-                                      _pageNumber++;
-                                      if (widget.document.count < _pageNumber) {
-                                        _pageNumber = widget.document.count;
-                                      }
-                                      _animateToPage();
-                                    },
-                        ),
-                      ),
-                      Expanded(
-                        child: IconButton(
-                          icon: Icon(Icons.last_page),
-                          tooltip: widget.tooltip.last,
-                          onPressed:
-                              _pageNumber == widget.document.count || _isLoading
-                                  ? null
-                                  : () {
-                                      _pageNumber = widget.document.count;
-                                      _jumpToPage();
-                                    },
-                        ),
-                      ),
-                    ],
-                  ),
-                )
-          : Container(
-              height: 0,
+                ) ??
+                _buildNavigationBar()
+          : const SizedBox.shrink(),
+    );
+  }
+
+  Widget _buildNavigationBar() {
+    return BottomAppBar(
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: <Widget>[
+          Expanded(
+            child: IconButton(
+              icon: const Icon(Icons.first_page),
+              tooltip: widget.tooltip.first,
+              onPressed: _pageNumber == 1 || _isLoading
+                  ? null
+                  : () {
+                      _pageNumber = 1;
+                      _jumpToPage();
+                    },
             ),
+          ),
+          Expanded(
+            child: IconButton(
+              icon: const Icon(Icons.chevron_left),
+              tooltip: widget.tooltip.previous,
+              onPressed: _pageNumber == 1 || _isLoading
+                  ? null
+                  : () {
+                      _pageNumber--;
+                      _animateToPage();
+                    },
+            ),
+          ),
+          if (widget.showPicker)
+            const Expanded(child: SizedBox.shrink())
+          else
+            const SizedBox(width: 1),
+          Expanded(
+            child: IconButton(
+              icon: const Icon(Icons.chevron_right),
+              tooltip: widget.tooltip.next,
+              onPressed: _pageNumber == widget.document.count || _isLoading
+                  ? null
+                  : () {
+                      _pageNumber++;
+                      _animateToPage();
+                    },
+            ),
+          ),
+          Expanded(
+            child: IconButton(
+              icon: const Icon(Icons.last_page),
+              tooltip: widget.tooltip.last,
+              onPressed: _pageNumber == widget.document.count || _isLoading
+                  ? null
+                  : () {
+                      _pageNumber = widget.document.count;
+                      _jumpToPage();
+                    },
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

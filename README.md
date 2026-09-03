@@ -1,72 +1,159 @@
 # ym_easy_pdf_viewer
 
-A flutter plugin for handling PDF files. Works on both Android & iOS. Originally forked from (https://github.com/yashmanghnani/ym_easy_pdf_viewer).
+[![pub package](https://img.shields.io/pub/v/ym_easy_pdf_viewer.svg)](https://pub.dev/packages/ym_easy_pdf_viewer)
 
-[![Pub Package](https://img.shields.io/pub/v/easy_pdf_viewer.svg?style=flat-square)](https://pub.dartlang.org/packages/ym_easy_pdf_viewer)
+A Flutter PDF viewer for Android and iOS. PDFs can be loaded from bundled assets,
+local files, or URLs and displayed with lazy page rendering, swipe navigation,
+page picking, and pinch/double-tap zoom.
 
+## Requirements
+
+- Flutter 3.47.2 or newer
+- Dart 3.13.2 or newer
+- Android API 23 or newer
+- iOS 15.0 or newer
+
+No storage or network permissions are required by the plugin itself. URL loading
+uses `flutter_cache_manager` and the platform renderers write temporary page
+previews to the application's cache directory.
 
 ## Installation
 
-```
-> flutter pub add ym_easy_pdf_viewer
-```
-
----
-
-## Android
-No permissions required. Uses application cache directory.
-
-## iOS
-No permissions required.
-
-## How-to:
-
-#### Load PDF
-```
-// Load from assets
-PDFDocument doc = await PDFDocument.fromAsset('assets/test.pdf');
- 
-// Load from URL
-PDFDocument doc = await PDFDocument.fromURL('https://www.ecma-international.org/wp-content/uploads/ECMA-262_12th_edition_june_2021.pdf');
-
-// Load from file
-File file  = File('...');
-PDFDocument doc = await PDFDocument.fromFile(file);
+```sh
+flutter pub add ym_easy_pdf_viewer
 ```
 
-#### Load pages
-```
-// Load specific page
-PDFPage pageOne = await doc.get(page: _number);
+Or add it to `pubspec.yaml`:
+
+```yaml
+dependencies:
+  ym_easy_pdf_viewer: ^1.0.0
 ```
 
-#### Pre-built viewer
-Use the pre-built PDF Viewer
+For pre-1.0 versions, update imports from
+`package:ym_easy_pdf_viewer/easy_pdf_viewer.dart` to
+`package:ym_easy_pdf_viewer/ym_easy_pdf_viewer.dart`.
+
+## Loading a document
+
+```dart
+import 'dart:io';
+
+import 'package:ym_easy_pdf_viewer/ym_easy_pdf_viewer.dart';
+
+final PDFDocument fromAsset =
+    await PDFDocument.fromAsset('assets/sample.pdf');
+
+final PDFDocument fromFile =
+    await PDFDocument.fromFile(File('/path/to/document.pdf'));
+
+final PDFDocument fromUrl = await PDFDocument.fromURL(
+  'https://example.com/document.pdf',
+  headers: <String, String>{'Authorization': 'Bearer token'},
+);
 ```
+
+Register assets in the application `pubspec.yaml` before calling
+`PDFDocument.fromAsset`:
+
+```yaml
+flutter:
+  assets:
+    - assets/sample.pdf
+```
+
+## Displaying the built-in viewer
+
+```dart
+class PdfScreen extends StatelessWidget {
+  const PdfScreen({required this.document, super.key});
+
+  final PDFDocument document;
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Example'),
-      ),
-      body: Center(
-          child: _isLoading
-              ? Center(child: CircularProgressIndicator())
-              : PDFViewer(document: document)),
+    return PDFViewer(
+      document: document,
+      lazyLoad: true,
+      showNavigation: true,
+      showPicker: true,
+      scrollDirection: Axis.horizontal,
     );
   }
+}
 ```
 
-This code produces the following view:
+Use `lazyLoad: false` only when the document is small and all pages should be
+rendered before the viewer becomes interactive. For larger documents, the
+default lazy mode keeps memory and startup time lower.
 
-![demo](./demo.png)
+## Rendering individual pages
 
-#### Third-party packages used
+```dart
+final PDFPage page = await document.get(page: 1);
 
-| Name                                                                                             | Description                                                                                                                               |
-| ------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| [path_provider](https://pub.dartlang.org/packages/path_provider)                                 | A Flutter plugin for finding commonly used locations on the filesystem. Supports iOS and Android.                                         |
-| [flutter_cache_manager](https://pub.dartlang.org/packages/flutter_cache_manager)                 | A CacheManager to download and cache files in the cache directory of the app. Various settings on how long to keep a file can be changed. |
-| [numberpicker](https://pub.dartlang.org/packages/numberpicker)                                   | NumberPicker is a custom widget designed for choosing an integer or decimal number by scrolling spinners.                                 |
-| [flutter_advanced_networkimage](https://pub.dartlang.org/packages/flutter_advanced_networkimage) | An advanced image provider provides caching and retrying for flutter app. Now with zoomable widget and transition to image widget.        |
-# ym_easy_pdf_viewer
+await for (final PDFPage page in document.getAll()) {
+  // Add each page to a custom layout.
+}
+```
+
+Page numbers are one-based. `PDFDocument.get` throws a `RangeError` when the
+requested page is outside the document.
+
+## Download progress
+
+```dart
+import 'dart:async';
+
+late final StreamSubscription<FileResponse> subscription;
+
+subscription = PDFDocument.fromURLWithDownloadProgress(
+  'https://example.com/document.pdf',
+  downloadProgress: (DownloadProgress progress) {
+    final int downloadedBytes = progress.downloaded ?? 0;
+    // Update the progress UI.
+  },
+  onDownloadComplete: (PDFDocument document) {
+    // Display the downloaded document.
+  },
+);
+
+// Cancel from dispose() if the screen is removed before completion.
+subscription.cancel();
+```
+
+## Cache management
+
+Rendered previews are cleared automatically when a document is loaded unless
+`clearPreviewCache: false` is provided. You can clear them explicitly:
+
+```dart
+await PDFDocument.clearPreviewCache();
+```
+
+Downloaded source files remain managed by the supplied `CacheManager`.
+
+## Viewer customization
+
+`PDFViewer` supports custom indicator and navigation builders, custom tooltips,
+background and button colors, vertical or horizontal paging, zoom limits,
+custom progress widgets, an external `PageController`, and an
+`onPageChanged` callback. See the Dart API documentation for the complete
+option list.
+
+## Development
+
+```sh
+flutter pub get
+flutter analyze
+flutter test
+flutter pub publish --dry-run
+```
+
+The `example` directory demonstrates asset, URL, and download-progress
+loading. Android builds use the Flutter Plugin DSL, Android Gradle Plugin 9.1,
+Gradle 9.3.1, and Java 17.
+
+## License
+
+This project is distributed under the license in [LICENSE](LICENSE).
