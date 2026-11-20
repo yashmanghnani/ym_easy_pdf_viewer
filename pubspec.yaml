@@ -1,18 +1,19 @@
 name: ym_easy_pdf_viewer
 description: A Flutter PDF viewer plugin with asset, file, URL, paging, zoom, and download progress support for Android and iOS.
-version: 1.0.0
+version: 2.0.0
 homepage: https://github.com/yashmanghnani/ym_easy_pdf_viewer
 repository: https://github.com/yashmanghnani/ym_easy_pdf_viewer
 issue_tracker: https://github.com/yashmanghnani/ym_easy_pdf_viewer/issues
 
 environment:
-  sdk: ">=3.13.2 <4.0.0"
-  flutter: ">=3.47.2"
+  sdk: ">=3.14.0 <4.0.0"
+  flutter: ">=3.50.1"
 
 dependencies:
   flutter:
     sdk: flutter
-  flutter_cache_manager: ^3.4.2
+  flutter_cache_manager: ^3.5.0
+  material_ui: ^1.11.1
   numberpicker: ^2.1.2
   path_provider: ^2.1.6
 

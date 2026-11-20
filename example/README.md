@@ -3,6 +3,8 @@
 Demonstrates asset, local/remote URL, page navigation, zoom, and download
 progress loading with `ym_easy_pdf_viewer`.
 
+Requires Flutter 3.50.1 or newer. The example uses `material_ui` and supports Android and iOS.
+
 Run it from this directory with:
 
 ```sh

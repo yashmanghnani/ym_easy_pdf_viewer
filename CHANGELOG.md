@@ -1,3 +1,10 @@
+## 2.0.0
+
+- Require Flutter 3.50.1 and Dart 3.14.
+- Migrate to standalone Material UI; apps using Material types must migrate too.
+- Update Android build tooling and package dependencies.
+- Bridge the legacy number picker during the Material migration.
+
 
 ## 1.0.0
 

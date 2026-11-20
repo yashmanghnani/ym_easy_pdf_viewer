@@ -8,14 +8,14 @@ page picking, and pinch/double-tap zoom.
 
 ## Requirements
 
-- Flutter 3.47.2 or newer
-- Dart 3.13.2 or newer
+- Flutter 3.50.1 or newer
+- Dart 3.14.0 or newer
 - Android API 23 or newer
 - iOS 15.0 or newer
 
-No storage or network permissions are required by the plugin itself. URL loading
-uses `flutter_cache_manager` and the platform renderers write temporary page
-previews to the application's cache directory.
+URL loading requires the Android app to declare `android.permission.INTERNET`
+in its main manifest. It uses `flutter_cache_manager`; platform renderers write
+temporary page previews to the application's cache directory.
 
 ## Installation
 
@@ -27,8 +27,14 @@ Or add it to `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  ym_easy_pdf_viewer: ^1.0.0
+  ym_easy_pdf_viewer: ^2.0.0
 ```
+
+Version 2.0 uses the standalone `material_ui` package. Migrate your app's Material
+imports and public Material types to `package:material_ui/material_ui.dart`.
+The page picker bridges its legacy `numberpicker` dependency. See the
+[Flutter migration guide](https://docs.flutter.dev/release/breaking-changes/material-ui-and-cupertino-ui)
+for mixing migrated and legacy widgets.
 
 For pre-1.0 versions, update imports from
 `package:ym_easy_pdf_viewer/easy_pdf_viewer.dart` to
@@ -151,8 +157,10 @@ flutter pub publish --dry-run
 ```
 
 The `example` directory demonstrates asset, URL, and download-progress
-loading. Android builds use the Flutter Plugin DSL, Android Gradle Plugin 9.1,
-Gradle 9.3.1, and Java 17.
+loading. Android builds use the Flutter Plugin DSL, Android Gradle Plugin 9.3.1,
+Gradle 9.5.0, and Java 17.
+
+iOS currently uses CocoaPods; Swift Package Manager support is not available.
 
 ## License
 

@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:easy_pdf_viewer_example/with_progress.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:ym_easy_pdf_viewer/ym_easy_pdf_viewer.dart';
 
 void main() => runApp(const App());

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:numberpicker/numberpicker.dart';
 
 class PagePicker extends StatefulWidget {
@@ -40,11 +40,15 @@ class _PagePickerState extends State<PagePicker> {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: Text(widget.title),
-      content: NumberPicker(
-        minValue: 1,
-        maxValue: widget.maxValue,
-        value: _currentValue,
-        onChanged: (int value) => setState(() => _currentValue = value),
+      // shortcut: numberpicker uses legacy Material; remove when it migrates.
+      // ignore: deprecated_member_use
+      content: MaterialUiCompatibilityBridge(
+        child: NumberPicker(
+          minValue: 1,
+          maxValue: widget.maxValue,
+          value: _currentValue,
+          onChanged: (int value) => setState(() => _currentValue = value),
+        ),
       ),
       actions: <Widget>[
         TextButton(

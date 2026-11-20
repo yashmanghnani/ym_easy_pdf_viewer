@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:ym_easy_pdf_viewer/ym_easy_pdf_viewer.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 class WithProgress extends StatefulWidget {
   const WithProgress({super.key});

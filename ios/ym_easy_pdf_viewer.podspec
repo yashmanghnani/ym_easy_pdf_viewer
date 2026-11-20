@@ -3,7 +3,7 @@
 #
 Pod::Spec.new do |s|
   s.name             = 'ym_easy_pdf_viewer'
-  s.version          = '1.0.0'
+  s.version          = '2.0.0'
   s.summary          = 'A Flutter PDF viewer for Android and iOS.'
   s.description      = <<-DESC
   A Flutter PDF viewer with asset, file, URL, paging, zoom, and download

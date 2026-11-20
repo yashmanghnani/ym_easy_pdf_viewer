@@ -1,25 +1,19 @@
 PODS:
   - Flutter (1.0.0)
-  - path_provider_foundation (0.0.1):
-    - Flutter
-    - FlutterMacOS
   - sqflite_darwin (0.0.4):
     - Flutter
     - FlutterMacOS
-  - ym_easy_pdf_viewer (1.0.0):
+  - ym_easy_pdf_viewer (2.0.0):
     - Flutter
 
 DEPENDENCIES:
   - Flutter (from `Flutter`)
-  - path_provider_foundation (from `.symlinks/plugins/path_provider_foundation/darwin`)
   - sqflite_darwin (from `.symlinks/plugins/sqflite_darwin/darwin`)
   - ym_easy_pdf_viewer (from `.symlinks/plugins/ym_easy_pdf_viewer/ios`)
 
 EXTERNAL SOURCES:
   Flutter:
     :path: Flutter
-  path_provider_foundation:
-    :path: ".symlinks/plugins/path_provider_foundation/darwin"
   sqflite_darwin:
     :path: ".symlinks/plugins/sqflite_darwin/darwin"
   ym_easy_pdf_viewer:
@@ -27,9 +21,8 @@ EXTERNAL SOURCES:
 
 SPEC CHECKSUMS:
   Flutter: 71a624a5bc0c04062bf19101d501e466baf2fb47
-  path_provider_foundation: 080d55be775b7414fd5a5ef3ac137b97b097e564
   sqflite_darwin: 20b2a3a3b70e43edae938624ce550a3cbf66a3d0
-  ym_easy_pdf_viewer: b0ca06663757742ba4a3eb1912d54649a94039da
+  ym_easy_pdf_viewer: 167b1e499f59f09c1906dca400c77b1f55d464fa
 
 PODFILE CHECKSUM: d6bc44bfaf31d0e80e1375ff53c8faede294dcb8
 
